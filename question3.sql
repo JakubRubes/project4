@@ -1,27 +1,44 @@
-WITH prices_by_year AS (
+WITH price_growth AS (
     SELECT
         food_category,
         year,
-        AVG(avg_price) AS avg_price
+        avg_price,
+        LAG(avg_price) OVER (
+            PARTITION BY food_category
+            ORDER BY year
+        ) AS prev_price
     FROM t_jakub_rubes_project_SQL_primary_final
-    GROUP BY food_category, year
 ),
 yearly_growth AS (
     SELECT
-        cur.food_category,
-        cur.year,
-        (cur.avg_price - prev.avg_price) / prev.avg_price * 100 AS yoy_growth
-    FROM prices_by_year cur
-    JOIN prices_by_year prev
-        ON cur.food_category = prev.food_category
-       AND cur.year = prev.year + 1
+        food_category,
+        (avg_price - prev_price) / prev_price * 100 AS yoy_growth_pct
+    FROM price_growth
+    WHERE prev_price IS NOT NULL
 )
 SELECT
     food_category,
-    ROUND(AVG(yoy_growth)::numeric, 2) AS avg_yearly_growth_pct
+    ROUND(AVG(yoy_growth_pct)::numeric, 2) AS avg_price_growth_pct
 FROM yearly_growth
 GROUP BY food_category
-ORDER BY avg_yearly_growth_pct;
+ORDER BY avg_price_growth_pct;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

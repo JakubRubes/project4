@@ -1,68 +1,55 @@
-WITH price_growth AS (
+WITH gdp_by_year AS (
     SELECT
-        cur.year,
-        AVG(
-            (cur.avg_price - prev.avg_price) / prev.avg_price * 100
-        ) AS price_growth_pct
-    FROM (
-        SELECT food_category, year, AVG(avg_price) AS avg_price
-        FROM t_jakub_rubes_project_SQL_primary_final
-        GROUP BY food_category, year
-    ) cur
-    JOIN (
-        SELECT food_category, year, AVG(avg_price) AS avg_price
-        FROM t_jakub_rubes_project_SQL_primary_final
-        GROUP BY food_category, year
-    ) prev
-        ON cur.food_category = prev.food_category
-       AND cur.year = prev.year + 1
-    GROUP BY cur.year
+        year,
+        gdp
+    FROM t_jakub_rubes_project_SQL_secondary_final_v2
+),
+gdp_growth AS (
+    SELECT
+        year,
+        (gdp - LAG(gdp) OVER (ORDER BY year))
+            / LAG(gdp) OVER (ORDER BY year) * 100 AS gdp_growth_pct
+    FROM gdp_by_year
+),
+wage_by_year AS (
+    SELECT
+        year,
+        AVG(avg_wage) AS avg_wage
+    FROM t_jakub_rubes_project_SQL_primary_final
+    GROUP BY year
 ),
 wage_growth AS (
     SELECT
-        cur.year,
-        AVG(
-            (cur.avg_wage - prev.avg_wage) / prev.avg_wage * 100
-        ) AS wage_growth_pct
-    FROM (
-        SELECT industry, year, AVG(avg_wage) AS avg_wage
-        FROM t_jakub_rubes_project_SQL_primary_final
-        GROUP BY industry, year
-    ) cur
-    JOIN (
-        SELECT industry, year, AVG(avg_wage) AS avg_wage
-        FROM t_jakub_rubes_project_SQL_primary_final
-        GROUP BY industry, year
-    ) prev
-        ON cur.industry = prev.industry
-       AND cur.year = prev.year + 1
-    GROUP BY cur.year
+        year,
+        (avg_wage - LAG(avg_wage) OVER (ORDER BY year))
+            / LAG(avg_wage) OVER (ORDER BY year) * 100 AS wage_growth_pct
+    FROM wage_by_year
+),
+price_by_year AS (
+    SELECT
+        year,
+        AVG(avg_price) AS avg_price
+    FROM t_jakub_rubes_project_SQL_primary_final
+    GROUP BY year
+),
+price_growth AS (
+    SELECT
+        year,
+        (avg_price - LAG(avg_price) OVER (ORDER BY year))
+            / LAG(avg_price) OVER (ORDER BY year) * 100 AS price_growth_pct
+    FROM price_by_year
 )
 SELECT
-    p.year,
-    ROUND(p.price_growth_pct::numeric, 2) AS price_growth_pct,
-    ROUND(w.wage_growth_pct::numeric, 2) AS wage_growth_pct,
-    ROUND((p.price_growth_pct - w.wage_growth_pct)::numeric, 2) AS growth_difference_pct
-FROM price_growth p
+    g.year,
+    ROUND(g.gdp_growth_pct::numeric, 2)   AS gdp_growth_pct,
+    ROUND(w.wage_growth_pct::numeric, 2)  AS wage_growth_pct,
+    ROUND(p.price_growth_pct::numeric, 2) AS price_growth_pct
+FROM gdp_growth g
 JOIN wage_growth w
-    ON p.year = w.year
-ORDER BY p.year;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    ON g.year = w.year
+JOIN price_growth p
+    ON g.year = p.year
+WHERE g.gdp_growth_pct IS NOT NULL
+  AND w.wage_growth_pct IS NOT NULL
+  AND p.price_growth_pct IS NOT NULL
+ORDER BY g.year;
